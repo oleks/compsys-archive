@@ -1,23 +1,22 @@
 = Your Canonical Build System — `make`
 Oleks Shturmov <oleks@oleks.info>
-v1.0, July 31, 2015
+v1.1, September 3, 2018 (original: July 31, 2015)
 :toc:
 
-Welcome to our short, practical introduction to the program `make` — your
-canonical build system.
+Welcome to a short, practical introduction to the program `make` —
+your canonical build system.
 
-This tutorial is not a comprehensive introduction to `make`. We only cover what
-you might need for the course http://www.webcitation.org/6a2I3GpLv[Machine
-Architecture (ARK)] at http://www.diku.dk[DIKU], and beyond. Most crucially,
+This tutorial is not a comprehensive introduction to `make`. We only
+cover what you might need for the course
+http://www.webcitation.org/6a2I3GpLv[Machine Architecture (ARK)], or
+more recently http://www.webcitation.org/729GrI7jh[Computer Systems
+(CompSys)], at http://www.diku.dk[DIKU], and beyond. Most crucially,
 `make` goes far beyond programming in C, we don't.
 
-This tutorial assumes that you've already set up
-link:a-unix-like-programming-environment.html[a Unix-like programming
-environment], know how to work with directories and files, and know your way
-around a text editor. We assume that you've already tried to
-link:getting-started-with-c.html[get started with C], but you don't have to
-have completed it yet. Another great kick-starter is the
-link:../../assignments/G1.html[G1 assignment].
+This tutorial assumes that you've already set up a Unix-like
+programming environment, know how to work with directories and files,
+and know your way around a text editor. We assume that you've already
+tried to get started with C.
 
 This tutorial assumes that you already have GNU Binutils and GCC, the GNU
 Compiler Collection installed.
