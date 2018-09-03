@@ -1,0 +1,775 @@
+= Your Canonical Build System — `make`
+Oleks Shturmov <oleks@oleks.info>
+v1.0, July 31, 2015
+:toc:
+
+Welcome to our short, practical introduction to the program `make` — your
+canonical build system.
+
+This tutorial is not a comprehensive introduction to `make`. We only cover what
+you might need for the course http://www.webcitation.org/6a2I3GpLv[Machine
+Architecture (ARK)] at http://www.diku.dk[DIKU], and beyond. Most crucially,
+`make` goes far beyond programming in C, we don't.
+
+This tutorial assumes that you've already set up
+link:a-unix-like-programming-environment.html[a Unix-like programming
+environment], know how to work with directories and files, and know your way
+around a text editor. We assume that you've already tried to
+link:getting-started-with-c.html[get started with C], but you don't have to
+have completed it yet. Another great kick-starter is the
+link:../../assignments/G1.html[G1 assignment].
+
+This tutorial assumes that you already have GNU Binutils and GCC, the GNU
+Compiler Collection installed.
+
+Go back to the aforementioned material if you are feeling uneasy.
+
+== Hello, `make`
+
+It is about as easy to get started with `make` as it is to
+link:getting-started-with-c[get started with C]. Hopefully, it takes a bit less
+forbearance to become proficient in `make`, than it takes to become proficient
+in C.
+
+To get started, link:a-unix-like-programming-environment.html[create an empty
+directory and navigate to it]:
+
+.Terminal
+----
+$ mkdir canon
+$ cd canon
+----
+
+Consider a simple program which fits on a file, which we can call `main.c`:
+
+.main.c
+----
+int main() { return 42; }
+----
+
+With no further work, we can already use `make` to compile this program:
+
+.Terminal
+----
+$ make main
+cc     main.c   -o main
+----
+
+[NOTE]
+====
+
+`cc` is a relic of the 70's. Typically, this is just a symbolic link to your
+standard C compiler. Presumably, this is GCC. You can check what `cc` really is
+using the programs `which` and `file`:
+
+.Terminal
+----
+$ which cc
+/usr/bin/cc
+$ file /usr/bin/cc
+/usr/bin/cc: symbolic link to gcc
+----
+====
+
+If we instead called our file `root.c` we would have to compile it like this:
+
+.Terminal
+----
+$ make root
+cc     root.c   -o root
+----
+
+If we forget the program name, `make` will complain, not knowing what to do:
+
+.Terminal
+----
+$ make
+make: *** No targets specified and no makefile found.  Stop.
+----
+
+Similarly, if we misspell the program name, `make` will complain:
+
+.Terminal
+----
+$ make homework
+make: *** No rule to make target 'homework'.  Stop.
+----
+
+As long as we pass the command-line argument `main` to `make`, `make` can
+link:getting-started-with-c.html[save us a couple keystrokes], and compile our
+`main.c` into an executable file called `main` on our behalf.
+
+[NOTE]
+====
+Your directory structure should now look like this:
+
+.Terminal
+----
+$ ls -lh
+-rwxr-xr-x [..] main
+-rw-r--r-- [..] main.c
+----
+====
+
+We can try to link:a-unix-like-programming-environment[run our program and
+check its exit code]:
+
+.Terminal
+----
+$ ./main || echo $?
+42
+----
+
+A classical feature of `make`, is that it helps us avoid unnecessary
+recompilations.
+
+Try to call `make main` again (without changing `main.c`):
+
+.Terminal
+----
+$ make main
+make: 'main' is up to date.
+----
+
+In this basic use, `make` takes `main.c` as a **prerequisite** for the
+**target** `main`. That is, `make` sets up a **dependency graph** which can be
+illustrated like this:
+
+           +------+
+           | main |
+           +------+
+              |
+ (depends on) |
+              v
+          +--------+
+          | main.c |
+          +--------+
+
+To implement this dependency graph, `make` will compare the **modification
+time** of `main.c` with that of `main`. If the prerequisite was modified after
+the target, `make` will run a **recipe** in attempt to bring the target "up to
+date" with the prerequisite.  The default recipe in this case, is to compile
+the C file.
+
+////
+Here's a spurious sequence of commands, you might try to make sure that
+everything works as we proclaim:
+
+.Terminal
+----
+$ echo "int main() { return 43; }" > root.c
+$ make root
+cc     root.c   -o root
+$ echo "int main() { return 42; }" > main.c
+$ make main
+cc     main.c   -o main
+$ make main
+make: 'main' is up to date.
+$ make main
+make: 'main' is up to date.
+$ make root
+make: 'root' is up to date
+$ ./main || echo $?
+42
+$ ./root || echo $?
+43
+$ ls -lh
+-rwxr-xr-x [..] main
+-rw-r--r-- [..] main.c
+-rwxr-xr-x [..] root
+-rw-r--r-- [..] root.c
+$ rm root
+$ rm root.c
+----
+////
+
+== Hello, `Makefile`
+
+The behaviour of calling `make` in a particular directory can be customized by
+creating a special file called `Makefile` in that directory. As a
+(de)motivating example, here is a `Makefile` that (in our case) will achieve
+the exact same effect as having no `Makefile` at all (except use the expected C
+compiler!):
+
+.Makefile
+----
+main: main.c
+	gcc main.c -o main
+----
+
+////
+IMPORTANT: The second line of the `Makefile` begins with a tab character.
+////
+
+[NOTE]
+====
+Your directory structure should now look like this:
+
+.Terminal
+----
+$ ls -lh
+-rwxr-xr-x [..] main
+-rw-r--r-- [..] main.c
+-rw-r--r-- [..] Makefile
+----
+====
+
+A `Makefile` specifies a number of **rules**. A rule has a number of
+**targets** and **prerequisites**, as well as a **recipe** for brining the
+targets "up to date" with the prerequisites. A recipe is a sequence of
+**commands** which will be called in order, from top to bottom, each in their
+own shell.
+
+////
+`make` will yield in error as soon as one of the commands of a
+recipe yields a non-zero exit code. Read on for an example.
+////
+
+The format of a `Makefile` rule goes as follows:
+
+----
+TARGETS `:` PREREQUISITES LINE-BREAK
+TAB COMMAND LINE-BREAK
+TAB COMMAND LINE-BREAK
+TAB COMMAND LINE-BREAK
+...
+----
+
+[IMPORTANT]
+====
+Every line of a recipe must begin with a **tab character**.
+
+To quote the http://www.gnu.org/software/make/manual/make.html#Introduction[GNU
+`make` manual]: "This is an obscurity that catches the unwary."
+====
+
+There is one benefit to our `Makefile` however: we no longer need to specify
+`main` as the command-line argument to `make`. It is now assumed by default:
+
+.Terminal
+----
+$ make
+make: 'main' is up to date.
+$ rm main
+$ make
+gcc main.c -o main
+----
+
+== Phony Targets
+
+////
+[quote, Your fellow student]
+Useless `main`, pointless `Makefile`, now "Phony Targets"?
+////
+
+To make our `Makefile` a bit more useful, let's create a classical phony target
+— `clean`. `clean` will be "phony" in the sense that its recipe will not
+produce a file called `clean`. Instead, `clean` will clean up the mess our
+invocations of `make` have made above — in our case, just remove the `main`
+file.
+
+A simple approach would've been to just add the `clean` target to our
+`Makefile`:
+
+.Makefile
+----
+#BadMakefile
+
+main: main.c
+	gcc main.c -o main
+
+clean:
+	rm main
+----
+
+Unfortunately, if we were ever to place a file called `clean` into our
+directory, the `clean` target would always be considered up to date (why?). For
+instance, consider the following session at the terminal:
+
+.Terminal
+----
+$ echo 42 > clean
+$ make clean
+make: 'clean' is up to date.
+$ make
+gcc main.c -o main
+$ make clean
+make: 'clean' is up to date.
+$ ls -lh
+-rw-r--r-- [..] clean
+-rwxr-xr-x [..] main
+-rw-r--r-- [..] main.c
+-rw-r--r-- [..] Makefile
+----
+
+To avoid this problem (and make sure the recipe for `clean` is always run when
+we ask it to), we have to mark the `clean` target as `.PHONY`:
+
+.Makefile
+----
+.PHONY: clean
+
+main: main.c
+	gcc main.c -o main
+
+clean:
+	rm main
+----
+
+Continuing the terminal session from before..
+
+.Terminal
+----
+$ make clean
+rm main
+----
+
+[NOTE]
+====
+If you followed our ill advice and created a file called `clean`, remove it so
+that we again have a directory structure like this:
+
+.Terminal
+----
+$ ls -lh
+-rwxr-xr-x [..] main
+-rw-r--r-- [..] main.c
+-rw-r--r-- [..] Makefile
+----
+====
+
+If you spuriously try to play around, and try to `make clean` again, you'll get
+to see `make` fail:
+
+.Terminal
+----
+$ make clean
+rm main
+rm: cannot remove ‘main’: No such file or directory
+Makefile:7: recipe for target 'clean' failed
+make: *** [clean] Error 1
+----
+
+The recipe is failing because we've already removed the file called
+`main`.`make` then tries to be helpful and tell us that it failed on line 7 of
+the `Makefile`, in the midst of the recipe for the `clean` target.
+
+A recipe fails as soon as one of its commands (executed in order from top to
+bottom) yields a non-zero exit code.
+
+This is what `rm` does for a nonexistent file. We can add a `-f` command-line
+argument to `rm` in our recipe to make `rm` ignore nonexistent files:
+
+.Makefile
+----
+.PHONY: clean
+
+main: main.c
+	gcc main.c -o main
+
+clean:
+	rm -f main
+----
+
+WARNING: `-f` should in general be used with caution — you might carelessly
+remove important files.
+
+Now we can go on a command spree again!
+
+.Terminal
+----
+$ make
+gcc main.c -o main
+$ make
+make: 'main' is up to date.
+$ make clean
+rm -f main
+$ make clean
+rm -f main
+$ ls -lh
+-rw-r--r-- [..] main.c
+-rw-r--r-- [..] Makefile
+----
+
+**Mental exercise:** Can you come up with other ways of solving the problem
+with the `clean` target?
+
+== A `test` target
+
+Another useful phony target is a `test` target to perform the tests we have
+thus far been doing manually. This target has a `main` executable as a
+prerequisite, and the recipe should run the executable and check its exit code.
+`test` is a good example of a phony target with prerequisites.
+
+One naïve approach could go as follows:
+
+.Makefile
+----
+#BadMakefile
+
+.PHONY: test clean
+
+main: main.c
+	gcc main.c -o main
+
+test: main
+	./main
+
+clean:
+	rm -f main
+----
+
+Let's try to `make test` and see what happens:
+
+.Terminal
+----
+$ make test
+./main
+Makefile:7: recipe for target 'test' failed
+make: *** [test] Error 42
+----
+
+So `./main` yields the expected exit code alright, but it is ill practice to
+designate a test error as a success.
+
+A better `Makefile` could go as follows:
+
+.Makefile
+----
+.PHONY: test clean
+
+main: main.c
+	gcc main.c -o main
+
+test: main
+	./main || echo $$?
+
+clean:
+	rm -f main
+----
+
+[IMPORTANT]
+.`Makefile` Variables
+====
+We need to double the dollar sign in our `Makefile` as a dollar sign is
+otherwise used to start a variable reference in a `Makefile`. We will come back
+to variables in makefiles below.
+====
+
+We can try to `make test` to make sure that things work as expected:
+
+.Terminal
+----
+$ make test
+./main || echo $?
+42
+----
+
+Note, the `test` target lists `main` as a prerequisite. So the dependency graph
+deduced by `make` can be illustrated as follows:
+
+           +------+
+           | test |
+           +------+
+              |
+ (depends on) |
+              v
+           +------+
+           | main |
+           +------+
+              |
+ (depends on) |
+              v
+          +--------+
+          | main.c |
+          +--------+
+
+To see how `make` implements this dependency graph, let's try to `make clean`
+and `make test`:
+
+.Terminal
+----
+$ make clean
+rm -f main
+$ make test
+gcc main.c -o main
+./main || echo $?
+42
+----
+
+Out of mere interest, let us try to introduce an error into our program and see
+how `make` will handle a compilation error:
+
+.Terminal
+----
+$ make clean
+$ echo "int main() { return x; }" > main.c
+$ make test
+gcc main.c -o main
+main.c: In function ‘main’:
+main.c:1:21: error: ‘x’ undeclared (first use in this function)
+ int main() { return x; }
+                     ^
+main.c:1:21: note: each undeclared identifier is reported only once for each function it appears in
+Makefile:4: recipe for target 'main' failed
+make: *** [main] Error 1
+----
+
+Perhaps as you had already expected, `make` stopped processing the dependency
+graph as soon as it encountered an error in one of the recipes.
+
+== The Default Target
+
+You might've noticed that `make` with no arguments still works despite the fact
+that there are now multiple targets in our `Makefile`:
+
+.Terminal
+----
+$ make
+make: 'main' is up to date.
+$ make clean
+rm -f main
+$ make
+gcc main.c -o main
+----
+
+`make` resolves target ambiguity in a very simple way — the top target is the
+default target, and in our `Makefile`, the top target is `main`.
+
+This is not a good default target for two reasons:
+
+. Good software development practice tells us to test early and test often.
+`make` is quick to type and probably what we'll use as we write our program.
+It is perhaps more responsible to have `test` as our default target.
+
+. It is a common `Makefile` convention to name the default target `all`.
+
+We can embrace both by adding a phony target `all` at the top of our
+`Makefile`, listing `test` as a prerequisite:
+
+.Makefile
+----
+.PHONY: all test clean
+
+all: test
+
+main: main.c
+	gcc main.c -o main
+
+test: main
+	./main || echo $$?
+
+clean:
+	rm -f main
+----
+
+Let's take the `Makefile` for a spin:
+
+.Terminal
+----
+$ make clean
+rm -f main
+$ make
+gcc main.c -o main
+./main || echo $?
+42
+----
+
+== A More Complicated Program
+
+Consider our stack calculator from the accompanying tutorial on
+link:getting-started-with-c.html[Getting Started with C].
+
+There, we had a stack data structure declared in a header file `stack.h`, and
+implemented in the C file `stack.c`. We compiled the implementation follows:
+
+.Terminal
+----
+gcc -Werror -Wall -Wextra -pedantic -std=c11 -c stack.c
+----
+
+We then had a file `calc.c` which implemented the actual stack calculator using
+the stack implementation above. `calc.c` contained a `main` function. So we
+then compiled the program as follows:
+
+.Terminal
+----
+gcc -Werror -Wall -Wextra -pedantic -std=c11 stack.o calc.c
+----
+
+Perhaps a natural `Makefile` for our stack calculator would then go as follows:
+
+.Makefile
+----
+.PHONY: all test clean
+
+all: test
+
+test:
+	./calc
+
+calc: stack.o calc.c
+	gcc -Werror -Wall -Wextra -pedantic -std=c11 stack.o calc.c
+
+stack.o: stack.h stack.c
+	gcc -Werror -Wall -Wextra -pedantic -std=c11 -c stack.c
+
+clean:
+	rm -f stack.o
+	rm -f calc
+----
+
+The dependency graph deduced by `make` in this case, can be illustrated as
+follows:
+
+           +-----+
+           | all |
+           +-----+
+              |
+ (depends on) |
+              v
+           +------+
+           | test |
+           +------+
+              |
+ (depends on) |
+              v
+           +------+
+           | calc |
+           +------+
+              |
+              +--------------+
+ (depends on) |              | (depends on)
+              v              v
+          +--------+    +---------+
+          | calc.c |    | stack.o |
+          +--------+    +---------+
+                             |
+                             +--------------+
+                (depends on) |              | (depends on)
+                             v              v
+                        +---------+    +---------+
+                        | stack.h |    | stack.c |
+                        +---------+    +---------+
+
+== Variables
+
+////
+So far, we have been using `cc` to invoke our compiler.
+
+Recall, that `cc` is just a symbolic link to the default C compiler on your
+machine:
+
+.Terminal
+----
+$ which cc
+/usr/bin/cc
+$ file /usr/bin/cc
+/usr/bin/cc: symbolic link to gcc
+----
+
+We have already discussed how we can use `make` to build the elements of our
+software project in proper order, and how to put some common software
+development tasks (such as compiling and testing) at our fingertips.
+
+A good build system also makes it easy to enforce project-wide standards and
+perform important changes.
+
+For instance, surely, we want to use _the same_ compiler for all of our source
+code, e.g. GCC. Not only that, but we want GCC to be just as pedantic about all
+of our source code.
+
+`Makefile` variables make this fairly straight-forward, without cluttering up
+our recipes `Makefile`:
+////
+
+Our `Makefile` is starting to get a little cryptic and a little fragile. Good
+software development practice tells us not to repeat ourselves. We are
+repeating ourselves with all those compiler flags, and the compiler flags
+obscuring our recipes.
+
+`Makefile` variables let us solve this in a straight-forward way. `Makefile`
+variables work a bit like simple C macros in that they are merely placeholders
+for text. Variables are typically declared at the top of the `Makefile`, named
+in ALL CAPS, with words occasionally separated by `_`.
+
+For instance, here's a `Makefile` that resolves our problems above:
+
+.Makefile
+----
+CC=gcc
+CFLAGS=-Werror -Wall -Wextra -pedantic -std=c11
+
+.PHONY: all test clean
+
+all: test
+
+test:
+	./calc
+
+calc: stack.o calc.c
+	$(CC) $(CFLAGS) stack.o calc.c
+
+stack.o: stack.h stack.c
+	$(CC) $(CFLAGS) -c stack.c
+
+clean:
+	rm -f stack.o
+	rm -f calc
+----
+
+NOTE: This `Makefile` also declares a variable for the compiler used. This is
+useful for the portability of our source code. Other machines may not have GCC
+installed, but use an equally adequate C compiler.
+
+== Conclusion
+
+We can use `make` to make sure to build the elements of our software project in
+proper order, and put common software development tasks at our fingertips. We
+can use `Makefile` variables to keep our recipes consistent, to the point, and
+flexible.
+
+We call `make` "canonical" because it is widely available in Unix-like
+programming environments. It is often used in large software projects, and is
+especially ubiquitous in the open-source and free software communities.
+
+`make` is old. Originally developed in 1977, it has had many derivatives.
+http://www.gnu.org/software/make/[GNU `make`], the version of `make` we've
+encouraged you to use here, is the standard implementation of `make` on most
+Linux and OS X systems. On Windows, the standard implementation is `nmake`, and
+https://msdn.microsoft.com/en-us/library/dd9y37ha.aspx[comes as part of Visual
+Studio].
+
+The rogue nature of `make` has also inspired the development of many
+alternative tools and companions. For instance, http://www.scons.org/[SCons],
+http://www.cmake.org/[CMake], and
+http://plan9.bell-labs.com/sys/doc/mk.html[Mk]. Each come with their own
+benefits and setbacks.
+
+A most notable critique of `make` is that it demands of you to manually manage
+your dependencies. Integrated Development Environments, such as
+http://www.eclipse.org/[Eclipse], https://developer.apple.com/xcode/[Xcode],
+and https://www.visualstudio.com/[Visual Studio], as well as many modern
+programming languages, such as http://golang.org/[Go] and
+http://www.rust-lang.org/[Rust], often come with their own build-automation
+tools, which automatically deduce dependencies from source-code. This results
+in unwarranted dependence on particular languages and tools.
+
+In today's world, `make` is reserved for those who want to exert grand control
+over the build process, and projects which depend on a great variety of untamed
+languages and tools. `make` is widespread till this day.
+
+== Further Study
+
+This tutorial is by no means a comprehensive introduction to `make`. Most
+notably, we've focused on programming in C, and forgotten to mention that
+`make` can be made to build dependencies in parallel, and that special,
+magic-looking makefile variables can be used to write terse recipes.
+
+There's probably more that we've forgotten. If you want to know more, here are
+a couple good resources for further study:
+
+. Pierce Lopez. _Make_. http://www.ploxiln.net/make.html. 2015. 
+
+. Free Software Foundation, Inc. GNU `make`.
+http://www.gnu.org/software/make/manual/make.html. 2014.
