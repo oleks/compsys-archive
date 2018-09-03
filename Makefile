@@ -3,7 +3,7 @@
 all: make.html
 
 %.html: %.asciidoc
-	asciidoc --backend html5 $<
+	asciidoctor -o $@ $<
 
 clean:
 	rm -f *.html
